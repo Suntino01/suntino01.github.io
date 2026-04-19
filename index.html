@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Занятость невролога</title>
+  <style>
+    body {
+  font-family: Arial, sans-serif;
+  margin: 10px;
+}
+
+h2 {
+  text-align: center;
+}
+
+.table-container {
+  width: 100%;
+  overflow-x: auto;
+}
+
+input, button {
+  font-size: 16px;
+  padding: 8px;
+  margin: 5px 0;
+  width: 100%;
+  max-width: 300px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 300px;
+}
+
+td, th {
+  border: 1px solid black;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+
+.busy { background-color: #f5a3a3; }
+.free { background-color: #c8f7c5; }
+.lunch { background-color: #ddd; }
+
+/* 📱 мобильная версия */
+@media (max-width: 600px) {
+  td, th {
+    padding: 6px;
+    font-size: 12px;
+  }
+
+  h2 {
+    font-size: 18px;
+  }
+}
+
+@media (max-width: 600px) {
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+
+  tr {
+    margin-bottom: 10px;
+    border: 1px solid #ccc;
+  }
+
+  th {
+    display: none;
+  }
+
+  td {
+    text-align: left;
+    padding-left: 50%;
+    position: relative;
+  }
+
+  td::before {
+    position: absolute;
+    left: 10px;
+    top: 6px;
+    font-weight: bold;
+  }
+
+  /* подписи */
+  td:nth-child(1)::before { content: "Время"; }
+  td:nth-child(2)::before { content: "Статус"; }
+}
+
+  </style>
+</head>
+
+<body>
+  <h2>Расписание (невролог)</h2>
+
+  <div class="table-container">
+  <table id="table"></table>
+  </div>
+
+  <div id="auth">
+    <input type="password" id="password" placeholder="Введите пароль">
+    <button onclick="login()">Войти</button>
+  </div>
+
+  <div id="app" style="display:none;">
+    <input type="file" id="file" accept=".xlsx" />
+    <br><br>
+    <button id="deleteBtn" style="display:none;" onclick="deleteRecord()">Удалить запись</button>
+    <br><br>
+    <table id="table"></table>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+
+  <script>
+    let role = null;
+    let globalData = null;
+    let selectedTime = null;
+
+    function login() {
+      const pass = document.getElementById('password').value;
+
+      if (pass === '1234') role = 'patient';
+      else if (pass === '4321') role = 'admin';
+      else return alert('Неверный пароль');
+
+      document.getElementById('auth').style.display = 'none';
+      document.getElementById('app').style.display = 'block';
+    }
+
+    function normTime(v) {
+      if (typeof v === 'number') {
+        const totalMinutes = Math.round(v * 24 * 60);
+        const h = Math.floor(totalMinutes / 60);
+        const m = totalMinutes % 60;
+        return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+      }
+      let s = String(v).trim();
+      if (s.length === 4) s = '0' + s;
+      return s;
+    }
+
+    document.getElementById('file').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+
+      reader.onload = function(evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+
+        globalData = json;
+
+        if (role === 'patient') processPatient(json);
+        else renderAdmin(json);
+      };
+
+      reader.readAsArrayBuffer(file);
+    });
+
+    function processPatient(json) {
+      const busy = new Set();
+
+      json.forEach((row, i) => {
+        if (i === 0) return;
+
+        const isEmpty = (!row[1] && !row[2] && !row[3]);
+        if (!isEmpty && row[0]) busy.add(normTime(row[0]));
+      });
+
+      renderPatient(busy);
+    }
+
+    function renderPatient(busy) {
+      const table = document.getElementById('table');
+
+      table.innerHTML = `<tr><th>Время</th><th>Статус</th></tr>`;
+
+      for (let h = 9; h <= 14; h++) {
+        for (let m of [0,30]) {
+          if (h === 14 && m === 30) continue;
+
+          const time = String(h).padStart(2,'0')+":"+String(m).padStart(2,'0');
+
+          const row = document.createElement('tr');
+          const t = document.createElement('td');
+          const s = document.createElement('td');
+
+          t.textContent = time;
+
+          if (time === '12:00') { s.textContent='Обед'; row.className='lunch'; }
+          else if (busy.has(time)) { s.textContent='Занято'; row.className='busy'; }
+          else { s.textContent='Свободно'; row.className='free'; }
+
+          row.appendChild(t);
+          row.appendChild(s);
+          table.appendChild(row);
+        }
+      }
+    }
+
+    function renderAdmin(json) {
+      const table = document.getElementById('table');
+      document.getElementById('deleteBtn').style.display = 'inline';
+
+      table.innerHTML = `<tr><th>Время</th><th>ФИО</th><th>Телефон</th><th>Услуга</th></tr>`;
+
+      json.forEach((row,i)=>{
+        if(i===0) return;
+
+        const tr=document.createElement('tr');
+        tr.onclick=()=>{
+          document.querySelectorAll('#table tr').forEach(r=>r.style.outline='');
+          tr.style.outline='2px solid blue';
+          selectedTime = normTime(row[0]);
+        };
+
+        const cells=[normTime(row[0]),row[1],row[2],row[3]];
+
+        cells.forEach(v=>{
+          const td=document.createElement('td');
+          td.textContent = v || '';
+          tr.appendChild(td);
+        });
+
+        table.appendChild(tr);
+      });
+    }
+
+    function deleteRecord(){
+      if(!selectedTime) return alert('Выберите запись');
+
+      for(let i=1;i<globalData.length;i++){
+        if(normTime(globalData[i][0])===selectedTime){
+          globalData[i][1]='';
+          globalData[i][2]='';
+          globalData[i][3]='';
+        }
+      }
+
+      renderAdmin(globalData);
+      selectedTime=null;
+
+      autoSave();
+    }
+
+    function autoSave(){
+      try {
+        const ws = XLSX.utils.aoa_to_sheet(globalData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Записи');
+
+        XLSX.writeFile(wb, 'записи_невролог_обновленный.xlsx');
+      } catch (e) {
+        console.error(e);
+        alert('Ошибка при сохранении файла');
+      }
+
+      renderAdmin(globalData);
+      selectedTime=null;
+    }
+  </script>
+</body>
+</html>
