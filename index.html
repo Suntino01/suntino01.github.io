@@ -71,21 +71,29 @@ td, th {
   }
 
   td {
-    text-align: left;
-    padding-left: 50%;
-    position: relative;
+  text-align: left;
+  padding: 8px 10px 8px 45%;
+  position: relative;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  white-space: normal;
+  min-height: 40px;
   }
 
   td::before {
-    position: absolute;
-    left: 10px;
-    top: 6px;
-    font-weight: bold;
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  width: 40%;
+  font-weight: bold;
+  white-space: normal;
   }
 
   /* подписи */
   td:nth-child(1)::before { content: "Время"; }
   td:nth-child(2)::before { content: "Статус"; }
+  td:nth-child(3)::before { content: "Телефон"; }
+  td:nth-child(4)::before { content: "Услуга"; }
 }
 
   </style>
@@ -93,10 +101,6 @@ td, th {
 
 <body>
   <h2>Расписание (невролог)</h2>
-
-  <div class="table-container">
-  <table id="table"></table>
-  </div>
 
   <div id="auth">
     <input type="password" id="password" placeholder="Введите пароль">
